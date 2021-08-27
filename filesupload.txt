@@ -1,0 +1,18 @@
+git checkout Dai-341-805
+git status
+cd ../indtry/Dai-341-805/
+cp Dai-341F-805R-demux.qzv Dai-341F-805R-demux-trimmed.qzv PairedEndFastqManifestPhred33.tsv SraAccList.txt ../../gitind/
+cd ../../gitind/
+ls
+mkdir Dai-341-805
+ls
+mv Dai-341F-805R-demux-trimmed.qzv PairedEndFastqManifestPhred33.tsv SraAccList.txt Dai-341F-805R-demux.qzv ./Dai-341-805/
+ls
+ls Dai-341-805/
+cd Dai-341-805/
+git add Dai-341F-805R-demux.qzv Dai-341F-805R-demux-trimmed.qzv PairedEndFastqManifestPhred33.tsv SraAccList.txt
+git commit -m "Dai files"
+git push origin Dai-341-805
+git checkout main
+cd ..
+git pull
