@@ -1,8 +1,8 @@
 Recordar que a partir de
-  Pos: 558F se comienzan a sobrelapar los primers
+	Pos: 558F se comienzan a sobrelapar los primers
 Todos los trabajos poseen
-  Primers en reversa (806R)
-  La secuencia consenso es: (anywhere): NACTACNVGGGTwTCTAATCC
+	Primers en reversa (806R)
+	La secuencia consenso es: (anywhere): NACTACNVGGGTwTCTAATCC
 Los de FonsecaG y Kearl están deprovistos del primer 515F
-  Los de Dai y Karray sí incluyen el primer con la secuencia
-    (anywhere): GTGCCAGCVGCSGCGGWAA
+	Los de Dai y Karray sí incluyen el primer con la secuencia
+	(anywhere): GTGCCAGCVGCSGCGGWAA
