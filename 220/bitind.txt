@@ -1,0 +1,212 @@
+#Todo este documento se basa en 'bitacora.txt'
+#Para esta ocasion, probrare el segundo metodo mencionado en 'bitmethod2.txt'
+#CLASIFICAR CON REFERENCIAS ESPECIFICAS PARA CADA ARTICULO DE ORIGEN
+#Ademas, usare un archivo 'SraAccList.txt' modificado, para excluir todo lo que no sea raiz (suelos)
+###METODO 2: CLASIFICAR CON REFERENCIAS ESPECIFICAS PARA CADA ARTICULO
+#Todo lo trabaje en
+cd /scratch/jcolchado/corrected/
+mkdir Dai-341-805  FonsecaGarcia-505-816  Karray-341-805  Kearl-515-806  Mukhtar-314-805  Mukhtar-515-907
+#Cree un archivo 'SraAccList.txt' para cada articulo, cada uno en su respectiva carpeta
+#Descargue los datos para cada articulo en una subcarpeta (de cada carpeta listada antes) llamada 'corridas'
+mkdir Dai-341-805/corridas/ FonsecaGarcia-505-816/corridas/ Karray-341-805/corridas/ Kearl-515-806/corridas/ \
+Mukhtar-314-805/corridas/ Mukhtar-515-907/corridas/
+cat ./ARTICULO/SraAccList.txt | xargs /app/sratoolkit.2.10.5-centos_linux64/bin/fasterq-dump \
+--outdir ./ARTICULO/corridas/
+#En cualquier seccion posterior, 'ARTICULO' equivale a alguno de los 6 directorios creados anteriormente
+#Posteriormente, cree un archivo '*FastqManifestPhred33.tsv' para cada carpeta
+#Los dos articulos de Mukhtar, '*'=='SingleEnd'
+#Para los demas '*'=='PairedEnd'
+qiime tools import --type 'SampleData[SequencesWithQuality]' --input-path ./ARTICULO/*FastqManifestPhred33.tsv \
+--output-path ./ARTICULO/ARTICULO-demux.qza --input-format *FastqManifestPhred33V2
+#Para los archivos PE, --type 'SampleData[PairedEndSequencesWithQuality]'
+######NOTA ALTERNA: PROBARE CON LOS DE MUKHTAR UTILIZAR PHRED64
+##### --input-format SingleEndFastqManifestPhred64V2
+######RESULTADO:
+##### An unexpected error has occurred: Decoded Phred score is out of range [0, 62].
+######CONCLUSION: LOS DATOS NO SON PHRED64
+####DEBIDO A QUE PARECE HABER SECUENCIAS EN MIXED-ORIENTATION TOME UNA MUESTRA DE 12 SEQS POR ARCHIVO (R1 Y R2)
+####DISPONIBLE COMO 'testfile.txt' EN github:gitind/corrvisual/testfile.txt
+∑###Realic√√© un alineamiento con pocas secuencias en 'Meite"
+∑###Basado en ello, recorte las regiones dl primer 515F y 806R, seg√√±, segun corr
+qiime cutadapt trim-paired --i-demultiplexed-sequences ./FonsecaGarcia-505-816/FonsecaG-505-816-demux.qza \
+--p-front-r NACTACNVGGGTWTCTAATCC --p-match-read-wildcards --p-match-adapter-wildcards --verbose \
+--o-trimmed-sequences ./FonsecaGarcia-505-816/FonsecaG-505-816-demux-cutadapt.qza
+qiime cutadapt trim-paired --i-demultiplexed-sequences ./Kearl-515-806/Kearl-505-806-demux.qza \
+--p-front-r NACTACNVGGGTWTCTAATCC --p-match-read-wildcards --p-match-adapter-wildcards --verbose \
+--o-trimmed-sequences ./Kearl-515-806/Kearl-515-806-demux-cutadapt.qza
+qiime cutadapt trim-paired --i-demultiplexed-sequences Karray-341-805-demux.qza \
+--p-front-f GTGCCAGCVGCSGCGGWAA --p-front-r NACTACNVGGGTWTCTAATCC --p-match-read-wildcards --p-match-adapter-wildcards \
+--verbose --o-trimmed-sequences Karray-341-805-demux-front.qza
+¬∑¬####Para el 'mix-oriented' de Dai
+qiime cutadapt trim-paired --i-demultiplexed-sequences Dai-341-805-demux.qza \
+--p-front-f GTGCCAGCVGCSGCGGWAA --p-match-read-wildcards --p-match-adapter-wildcards \
+--p-discard-untrimmed --verbose --o-trimmed-sequences ./forward-try/Dai-341-805-demux-F.qza
+qiime cutadapt trim-paired --i-demultiplexed-sequences Dai-341-805-demux.qza \
+--p-front-f NACTACNVGGGTWTCTAATCC --p-match-read-wildcards --p-match-adapter-wildcards \
+--p-discard-untrimmed --verbose --o-trimmed-sequences ./forward-try/Dai-341-805-demux-R.qza
+####VISUALIZACION
+qiime demux summarize --i-data ARTICULO-demux-cutadapt.qza \
+--o-visualization ARTICULO-demux-cutadapt.qzv
+###Para los SE files de Mukhtar
+##Tras visualizar, los archivos de v3-v4 son inutilizables de previa, comprobare despues
+qiime cutadapt trim-single --i-demultiplexed-sequences Mukhtar-515-907-demux.qza \
+--p-front GTGCCAGCVGCSGCGGWAA --p-match-read-wildcards --p-match-adapter-wildcards \
+--p-discard-untrimmed --verbose --o-trimmed-sequences Mukhtar-515-907-demux-cutadapt.qza
+######Denoising
+##Forward length: 50
+##Reverse length: 220
+##Estimated overlap: 20
+mkdir
+qiime dada2 denoise-paired --i-demultiplexed-seqs ARTICULO-demux-cutadapt.qza --p-trunc-len-f 50 --p-trunc-len-r 220 \
+--p-max-ee-r 4 --p-min-fold-parent-over-abundance 8 --p-chimera-method pooled --o-table ./asvs/ART-table-dada2.qza \
+--o-representative-sequences ./asvs/ART-rep-seqs.qza --o-denoising-stats ./asvs/ART-stats-dada2.qza
+###Reordenar las secuencias de Dai
+##cat file.fastq | paste - - - - | sort -k1,1 -t " " | tr "\t" "\n" > file_sorted.fastq
+###No funciono, hasta no incluir una opcion --p-mixed-orientation, Dai queda descartado
+####MEZCLA de tablas y secuencias
+qiime feature-table merge --i-tables FonsecaG-table-dada2.qza --i-tables Karray-table-dada2.qza \
+--i-tables Kearl-table-dada2.qza --i-tables Mukhtar-table-dada2.qza --o-merged-table merged-table.qza
+qiime feature-table merge-seqs --i-data FonsecaG-rep-seqs.qza --i-data Karray-rep-seqs.qza \
+--i-data Kearl-rep-seqs.qza --i-data Mukhtar-rep-seqs.qza --o-merged-data merged-rep-seqs.qza
+qiime tools export --input-path merged-table.qza --output-path asv-table
+biom convert -i asv-table/feature-table.biom -o asv-table/asv-table.tsv --to-tsv
+qiime tools export --input-path merged_rep-seqs.qza --output-path asvs
+qiime feature-table tabulate-seqs --i-data merged_rep-seqs.qza --o-visualization merged_rep-seqs.qzv
+qiime feature-table summarize --i-table 
+###El clasificador fue entrenado para los primers especrs epescificos mencionados aqui
+#515F: GTGCCAGCVGCSGCGGWAA
+#806R: NACTACNVGGGTWTCTAATCC
+#Ademas, descargue las secuencias completas, en scratch
+##Para este paso, es necesario configurar
+## $TMPDIR='/scratch/jcolchado/tempfilesQ2'
+curl -sL "https://data.qiime2.org/2021.8/common/silva-138-99-seqs.qza" > "SILVA_full_seqs.qza"
+curl -sL "https://data.qiime2.org/2021.8/common/silva-138-99-tax.qza" > "SILVA_full_tax.qza"
+qiime feature-classifier extract-reads --i-sequences SILVA_full_seqs.qza --p-f-primer GTGCCAGCVGCSGCGGWAA \
+--p-r-primer NACTACNVGGGTWTCTAATCC --p-trunc-len 250 --o-reads ref-seqs-SILVA.qza
+qiime feature-classifier fit-classifier-naive-bayes --i-reference-reads ref-seqs-SILVA.qza \
+--i-reference-taxonomy SILVA_full_tax.qza --o-classifier classifier-SILVA.qza
+qiime feature-classifier classify-sklearn --i-classifier classifier-SILVA.qza --i-reads merged-rep-seqs.qza \
+--o-classification asvs-taxonomy.qza
+qiime tools export --input-path asvs-taxonomy.qza --output-path tax-dir
+mv tax-dir/taxonomy.tsv tax-dir/silva-taxonomy.tsv
+###FILTRADO y AGRUPADO
+qiime taxa filter-table --i-table merged-table.qza --i-taxonomy asvs-taxonomy.qza \
+--p-exclude mitochondria,chloroplast,Unassigned,Eukaryota --o-filtered-tab√le fitered-table.qza
+qiime feature-table group --i-table filtered-table.qza --m-metadata-file ./FonsecaGarcia-505-816/220/metadata.tsv \
+--m-metadata-column Host --p-axis sample --p-mode sum --o-grouped-table filt-sum-grouped-table.qza
+qiime feature-table group --i-table filtered-table.qza --m-metadata-file ./FonsecaGarcia-505-816/220/metadata.tsv \
+--m-metadata-column Host --p-axis sample --p-mode mean-ceiling --o-grouped-table filt-mean-grouped-table.qza
+qiime feature-table group --i-table filtered-table.qza --m-metadata-file ./FonsecaGarcia-505-816/220/metadata.tsv \
+--m-metadata-column Host --p-axis sample --p-mode median-ceiling --o-grouped-table filt-median-grouped-table.qza
+###BOXPLOTS
+qiime taxa barplot --i-table filt-METH-grouped-table.qza --i-taxonomy asvs-taxonomy.qza \
+--m-metadata-file group-metadata.tsv --o-visualization METH-barplots.qzv
+
+#Incluye los archivos de SILVA para la region de interes, ref-seqs.qza del primer proceso
+#Y classifier.qza, renombrados al par de primers que representan
+#Ademas, descargue las secuencias completas, en scratch
+curl -sL "https://data.qiime2.org/2021.4/common/silva-138-99-seqs.qza" > "SILVA_full_seqs.qza"
+curl -sL "https://data.qiime2.org/2021.4/common/silva-138-99-tax.qza" > "SILVA_full_tax.qza"
+#Estas las usare para entrenar dos referencias
+##La primera es para el par
+#341F: CCTACGGGNGGCWGCAG
+#805R: GACTACNVGGGTWTCTAAT
+qiime feature-classifier extract-reads --i-sequences SILVA_full_seqs.qza --p-f-primer CCTACGGGNGGCWGCAG \
+--p-r-primer GACTACNVGGGTWTCTAAT --p-trunc-len 150 --o-reads ref-seqs-341F-805R.qza
+qiime feature-classifier fit-classifier-naive-bayes --i-reference-reads ref-seqs-341F-805R.qza \
+--i-reference-taxonomy SILVA_full_tax.qza --o-classifier classifier-341F-805R.qza
+##La segunda es para el par
+#515F: GTGCCAGCMGCCGCGG
+#907R: CCGTCAATTCMTTTRAGTTT
+qiime feature-classifier extract-reads --i-sequences SILVA_full_seqs.qza --p-f-primer GTGCCAGCMGCCGCGG \
+--p-r-primer CCGTCAATTCMTTTRAGTTT --p-trunc-len 150 --o-reads ref-seqs-515F-907R.qza
+qiime feature-classifier fit-classifier-naive-bayes --i-reference-reads ref-seqs-515F-907R.qza \
+--i-reference-taxonomy SILVA_full_tax.qza --o-classifier classifier-515F-907R.qza
+##Para realizar ambos procesos trabaje en 'scratch'
+cd /scratch/jcolchado
+mkdir ./tempfilesQ2
+export TMPDIR='/scratch/jcolchado/tempfilesQ2/'
+
+######PROCESO CON 505F/806R
+#Copie los archivos del original a una carpeta nueva (todo hasta 'classify' va en 'scratch')
+mkdir 515F_805R
+cd 515F_805R
+cp /scratch/jcolchado/firsttry/ref-seqs-505F-806R.qza /scratch/jcolchado/firsttry/classifier-505F-806R.qza \
+/home/jcolchado/practicaQ2/v3_v4/se_sequences/se-505F-806R-demux.qza \
+/home/jcolchado/practicaQ2/v3_v4/se_sequences/demux-summary-505F-806R.qzv .
+##Los primeros dos archivos son los anteriormente renombrados (ver arriba)
+##Los ultimos dos provienen de los siguientes comandos (ejecutados en '$HOME/practicaQ2/v3_v4/se-sequences/')
+#qiime tools import --type 'SampleData[SequencesWithQuality]' --input-path se-33-505F-806R-manifest \
+#--output-path se-505F-806R-demux.qza --input-format SingleEndFastqManifestPhred33V2
+#qiime demux summarize --i-data se-505F-806R-demux.qza --o-visualization demux-summary-505F-806R.qzv
+##Resultados similares ya existen para los otros dos pares de primers
+#A continuaci√≥n es necesario trimear. Usare len=120 (para no superar los 150 del clasificador)
+qiime dada2 denoise-single --p-trim-left 0 --p-trunc-len 120 --i-demultiplexed-seqs se-505F-806R-demux.qza \
+--o-representative-sequences rep-seqs-505F-806R.qza --o-table table-505F-806R.qza \
+--o-denoising-stats stats-505F-806R.qza
+#Visualizar trimeo
+qiime metadata tabulate --m-input-file stats-505F-806R.qza --o-visualization denoising-stats-505F-806R.qzv
+#Clasificar
+qiime feature-classifier classify-sklearn --i-classifier classifier-505F-806R.qza --i-reads rep-seqs-505F-805R.qza \
+--o-classification taxonomy-505F-806R.qza
+qiime tools export --input-path taxonomy-505F-806R.qza --output-path asv_tax_dir_505806
+mv asv_tax_dir_505806/taxonomy.tsv asv_tax_dir_505806/SILVA_505F_806R_taxonomy.tsv
+qiime metadata tabulate --m-input-file taxonomy-505F-806R.qza --o-visualization taxonomy-505F-806R.qzv
+qiime taxa filter-table --i-table table-505F-806R.qza --i-taxonomy taxonomy-505F-806R.qza \
+ --p-exclude mitochondria,chloroplast,Unassigned --o-filtered-table filtered-taxonomy-505F-806R.qza
+
+######PROCESO CON 341F/805R
+#Copie los archivos del original a una carpeta nueva (todo hasta 'classify' va en 'scratch')
+mkdir 341F_805R
+cd 341F_805R
+cp /scratch/jcolchado/ref-seqs-341F-805R.qza /scratch/jcolchado/classifier-341F-805R.qza \
+/home/jcolchado/practicaQ2/v3_v4/se_sequences/se-341F-805R-demux.qza \
+/home/jcolchado/practicaQ2/v3_v4/se_sequences/demux-summary-341F-805R.qzv .
+##La proveniencia es similar al 505F/806R (y en el caso del primer siguiente)
+#Trimeo
+qiime dada2 denoise-single --p-trim-left 0 --p-trunc-len 120 --i-demultiplexed-seqs se-341F-805R-demux.qza \
+--o-representative-sequences rep-seqs-341F-805R.qza --o-table table-341F-805R.qza \
+--o-denoising-stats stats-341F-805R.qza
+#Visualizar trimeo
+qiime metadata tabulate --m-input-file stats-341F-805R.qza --o-visualization denoising-stats-341F-805R.qzv
+#Clasificar
+qiime feature-classifier classify-sklearn --i-classifier classifier-341F-805R.qza --i-reads rep-seqs-341F-805R.qza \
+--o-classification taxonomy-341F-805R.qza
+qiime tools export --input-path taxonomy-341F-805R.qza --output-path asv_tax_dir_341805
+mv asv_tax_dir_341805/taxonomy.tsv asv_tax_dir_341805/SILVA_341F_805R_taxonomy.tsv
+qiime metadata tabulate --m-input-file taxonomy-341F-805R.qza --o-visualization taxonomy-341F-805R.qzv
+qiime taxa filter-table --i-table table-341F-805R.qza --i-taxonomy taxonomy-341F-805R.qza \
+ --p-exclude mitochondria,chloroplast,Unassigned --o-filtered-table filtered-taxonomy-341F-805R.qza
+
+######PROCESO CON 515F/907R
+#Copie los archivos del original a una carpeta nueva (todo hasta 'classify' va en 'scratch')
+mkdir 515F_907R
+cd 515F_907R
+cp /scratch/jcolchado/ref-seqs-515F-907R.qza /scratch/jcolchado/classifier-515F-907R.qza \
+/home/jcolchado/practicaQ2/v3_v4/se_sequences/se-505F-907R-demux.qza \
+/home/jcolchado/practicaQ2/v3_v4/se_sequences/demux-summary-505F-907R.qzv .
+##La proveniencia es similar al 505F/806R (y en el caso del primer anterior)
+#Trimeo
+qiime dada2 denoise-single --p-trim-left 0 --p-trunc-len 120 --i-demultiplexed-seqs se-505F-907R-demux.qza \
+--o-representative-sequences rep-seqs-515F-907R.qza --o-table table-515F-907R.qza \
+--o-denoising-stats stats-515F-907R.qza
+#Visualizar trimeo
+qiime metadata tabulate --m-input-file stats-515F-907R.qza --o-visualization denoising-stats-515F-907R.qzv
+#Clasificar
+qiime feature-classifier classify-sklearn --i-classifier classifier-515F-907R.qza --i-reads rep-seqs-515F-907R.qza \
+--o-classification taxonomy-515F-907R.qza
+qiime tools export --input-path taxonomy-515F-907R.qza --output-path asv_tax_dir_515907
+mv asv_tax_dir_515907/taxonomy.tsv asv_tax_dir_515907/SILVA_515F_907R_taxonomy.tsv
+qiime metadata tabulate --m-input-file taxonomy-515F-907R.qza --o-visualization taxonomy-515F-907R.qzv
+qiime taxa filter-table --i-table table-515F-907R.qza --i-taxonomy taxonomy-515F-907R.qza \
+ --p-exclude mitochondria,chloroplast,Unassigned --o-filtered-table filtered-taxonomy-515F-907R.qza
+
+##Con las asignaciones hechas individualmente, fusionar
+cd /scratch/jcolchado
+qiime feature-table merge-taxa --i-data 341F_805R/taxonomy-341F-805R.qza 515F_805R/taxonomy-505F-806R.qza \
+515F_907R/taxonomy-515F-907R.qza --o-merged-data merged-taxonomy.qza
+qiime feature-table merge --i-tables 341F_805R/table-341F-805R.qza 515F_805R/table-505F-806R.qza \
+515F_907R/table-515F-907R.qza --o-merged-table merged-table.qza
+cp /home/jcolchado/practicaQ2/v3_v4/se_sequences/metadata.tsv .
+qiime taxa barplot --i-table table.qza --i-taxonomy taxonomy.qza --m-metadata-file metadata.tsv \
+ --o-visualization taxa-bar-plots.qzv
